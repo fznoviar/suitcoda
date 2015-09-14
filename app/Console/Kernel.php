@@ -13,7 +13,8 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        'Suitcoda\Console\Commands\NewUserCommand'
+        'Suitcoda\Console\Commands\NewUserCommand',
+        'Suitcoda\Console\Commands\CrawlUrlCommand'
     ];
 
     /**
