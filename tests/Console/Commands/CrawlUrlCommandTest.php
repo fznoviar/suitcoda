@@ -22,7 +22,7 @@ class CrawlUrlCommandTest extends TestCase
     public function testCommand()
     {
         $this->artisan('crawl:url', [
-            'url' => 'suitmedia.com'
+            'url' => 'foobar.com'
         ]);
     }
 }

@@ -11,6 +11,10 @@ class CrawlerUrl
 
     protected $siteLink;
 
+    protected $siteJs;
+
+    protected $siteCss;
+
     protected $linkToCrawl;
 
     protected $countBrokenLink;
@@ -22,6 +26,8 @@ class CrawlerUrl
         $this->client = $client;
 
         $this->siteLink = array();
+        $this->siteJs = array();
+        $this->siteCss = array();
         $this->linkToCrawl = array();
         $this->countBrokenLink = 0;
     }
@@ -74,18 +80,37 @@ class CrawlerUrl
 
     protected function getAllUrl($crawler)
     {
-        $crawlers = $crawler->filter('a')->extract('href');
-        foreach ($crawlers as $nodeUrl) {
+        $crawlersUrl = $crawler->filter('a')->extract('href');
+        foreach ($crawlersUrl as $nodeUrl) {
             $nodeUrl = $this->normalizeLink($nodeUrl);
             if ($this->checkIfCrawlable($nodeUrl) && !$this->checkIfExternal($nodeUrl)) {
-                $normalUri = $this->normalizeLink($nodeUrl);
-                if (!in_array($normalUri, $this->siteLink)) {
-                    array_push($this->siteLink, $normalUri);
+                if (!in_array($nodeUrl, $this->siteLink)) {
+                    array_push($this->siteLink, $nodeUrl);
                 }
             }
         }
 
-        return $this->siteLink;
+        $crawlersCss = $crawler->filter('link')->extract('href');
+        foreach ($crawlersCss as $nodeUrl) {
+            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
+            $nodeUrl = $this->normalizeLink($nodeUrl);
+            if (!$this->checkIfExternal($nodeUrl)) {
+                if (!in_array($nodeUrl, $this->siteCss) && strcmp($path, 'css') === 0) {
+                    array_push($this->siteCss, $nodeUrl);
+                }
+            }
+        }
+
+        $crawlersJs = $crawler->filter('script')->extract('src');
+        foreach ($crawlersJs as $nodeUrl) {
+            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
+            $nodeUrl = $this->normalizeLink($nodeUrl);
+            if (!$this->checkIfExternal($nodeUrl)) {
+                if (!in_array($nodeUrl, $this->siteJs) && strcmp($path, 'js') === 0) {
+                    array_push($this->siteJs, $nodeUrl);
+                }
+            }
+        }
     }
 
     public function checkIfExternal($url)
@@ -126,6 +151,18 @@ class CrawlerUrl
     {
         sort($this->siteLink);
         return $this->siteLink;
+    }
+
+    public function getSiteCss()
+    {
+        sort($this->siteCss);
+        return $this->siteCss;
+    }
+
+    public function getSiteJs()
+    {
+        sort($this->siteJs);
+        return $this->siteJs;
     }
 
     public function getCountBrokenLink()

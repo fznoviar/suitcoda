@@ -32,7 +32,6 @@ class CrawlerUrlTest extends TestCase
         $this->assertEquals(false, $crawl->checkIfCrawlable('#'));
         $this->assertEquals(false, $crawl->checkIfCrawlable(''));
         $this->assertEquals(1, $crawl->getCountBrokenLink());
-
     }
 
     public function testUrlIsExternalUrl()
@@ -53,7 +52,7 @@ class CrawlerUrlTest extends TestCase
         $this->assertEquals(false, $crawl->checkIfExternal('http://foobar.com/test'));
     }
 
-    public function testCrawling()
+    public function testCrawlingUrl()
     {
         $links = [
             'https://suitmedia.com/index.php/client',
@@ -63,13 +62,12 @@ class CrawlerUrlTest extends TestCase
         $client = Mockery::mock(Client::class);
         $response = Mockery::mock(Response::class);
         $domCrawler = Mockery::mock(Crawler::class);
-        // dd($domCrawler);
 
         $client->shouldReceive('request')->andReturn($domCrawler);
         $client->shouldReceive('getResponse')->andReturn($response);
         $response->shouldReceive('getStatus')->andReturn(200);
         $response->shouldReceive('getHeader')->with('Content-Type')->andReturn('text/html');
-        $domCrawler->shouldReceive('filter')->with('a')->andReturn($domCrawler);
+        $domCrawler->shouldReceive('filter')->andReturn($domCrawler);
         $domCrawler->shouldReceive('extract')->andReturn($links);
 
         $crawl = new CrawlerUrl($client);
@@ -77,5 +75,53 @@ class CrawlerUrlTest extends TestCase
         
         $crawl->crawling();
         $this->assertEquals($links, $crawl->getSiteLink());
+    }
+
+    public function testCrawlingCss()
+    {
+        $css = [
+            'http://foobar.com/assets/css/main.css',
+        ];
+
+        $client = Mockery::mock(Client::class);
+        $response = Mockery::mock(Response::class);
+        $domCrawler = Mockery::mock(Crawler::class);
+
+        $client->shouldReceive('request')->andReturn($domCrawler);
+        $client->shouldReceive('getResponse')->andReturn($response);
+        $response->shouldReceive('getStatus')->andReturn(200);
+        $response->shouldReceive('getHeader')->with('Content-Type')->andReturn('text/html');
+        $domCrawler->shouldReceive('filter')->andReturn($domCrawler);
+        $domCrawler->shouldReceive('extract')->andReturn($css);
+
+        $crawl = new CrawlerUrl($client);
+        $crawl->setBaseUrl('foobar.com');
+        
+        $crawl->crawling();
+        $this->assertEquals($css, $crawl->getSiteCss());
+    }
+
+    public function testCrawlingJs()
+    {
+        $js = [
+            'http://foobar.com/assets/js/main.js',
+        ];
+
+        $client = Mockery::mock(Client::class);
+        $response = Mockery::mock(Response::class);
+        $domCrawler = Mockery::mock(Crawler::class);
+
+        $client->shouldReceive('request')->andReturn($domCrawler);
+        $client->shouldReceive('getResponse')->andReturn($response);
+        $response->shouldReceive('getStatus')->andReturn(200);
+        $response->shouldReceive('getHeader')->with('Content-Type')->andReturn('text/html');
+        $domCrawler->shouldReceive('filter')->andReturn($domCrawler);
+        $domCrawler->shouldReceive('extract')->andReturn($js);
+
+        $crawl = new CrawlerUrl($client);
+        $crawl->setBaseUrl('foobar.com');
+        
+        $crawl->crawling();
+        $this->assertEquals($js, $crawl->getSitejs());
     }
 }
