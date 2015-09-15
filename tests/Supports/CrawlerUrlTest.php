@@ -8,6 +8,7 @@ use Suitcoda\Supports\CrawlerUrl;
 use Goutte\Client;
 use Illuminate\Http\Response;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\HttpFoundation\Request;
 
 class CrawlerUrlTest extends TestCase
 {
@@ -62,13 +63,19 @@ class CrawlerUrlTest extends TestCase
         $client = Mockery::mock(Client::class);
         $response = Mockery::mock(Response::class);
         $domCrawler = Mockery::mock(Crawler::class);
+        $request = Mockery::mock(Request::class);
 
         $client->shouldReceive('request')->andReturn($domCrawler);
         $client->shouldReceive('getResponse')->andReturn($response);
+        $client->shouldReceive('getRequest')->andReturn($request);
         $response->shouldReceive('getStatus')->andReturn(200);
         $response->shouldReceive('getHeader')->with('Content-Type')->andReturn('text/html');
         $domCrawler->shouldReceive('filter')->andReturn($domCrawler);
-        $domCrawler->shouldReceive('extract')->andReturn($links);
+        $domCrawler->shouldReceive('extract')->andReturn([
+            'https://suitmedia.com/index.php/client',
+            '/index.php/home'
+        ]);
+        $request->shouldReceive('getUri')->andReturn('https://suitmedia.com');
 
         $crawl = new CrawlerUrl($client);
         $crawl->setBaseUrl('suitmedia.com');
@@ -86,13 +93,16 @@ class CrawlerUrlTest extends TestCase
         $client = Mockery::mock(Client::class);
         $response = Mockery::mock(Response::class);
         $domCrawler = Mockery::mock(Crawler::class);
+        $request = Mockery::mock(Request::class);
 
         $client->shouldReceive('request')->andReturn($domCrawler);
         $client->shouldReceive('getResponse')->andReturn($response);
+        $client->shouldReceive('getRequest')->andReturn($request);
         $response->shouldReceive('getStatus')->andReturn(200);
         $response->shouldReceive('getHeader')->with('Content-Type')->andReturn('text/html');
         $domCrawler->shouldReceive('filter')->andReturn($domCrawler);
         $domCrawler->shouldReceive('extract')->andReturn($css);
+        $request->shouldReceive('getUri');
 
         $crawl = new CrawlerUrl($client);
         $crawl->setBaseUrl('foobar.com');
@@ -110,13 +120,16 @@ class CrawlerUrlTest extends TestCase
         $client = Mockery::mock(Client::class);
         $response = Mockery::mock(Response::class);
         $domCrawler = Mockery::mock(Crawler::class);
+        $request = Mockery::mock(Request::class);
 
         $client->shouldReceive('request')->andReturn($domCrawler);
         $client->shouldReceive('getResponse')->andReturn($response);
+        $client->shouldReceive('getRequest')->andReturn($request);
         $response->shouldReceive('getStatus')->andReturn(200);
         $response->shouldReceive('getHeader')->with('Content-Type')->andReturn('text/html');
         $domCrawler->shouldReceive('filter')->andReturn($domCrawler);
         $domCrawler->shouldReceive('extract')->andReturn($js);
+        $request->shouldReceive('getUri');
 
         $crawl = new CrawlerUrl($client);
         $crawl->setBaseUrl('foobar.com');

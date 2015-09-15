@@ -57,6 +57,10 @@ class CrawlerUrl
     {
         $uri = preg_replace('@#.*$@', '', $uri);
 
+        if (strcmp(substr($uri, 0, 1), '/') === 0) {
+            $uri = $this->getBaseUrl() . $uri;
+        }
+
         return $uri;
     }
 
@@ -68,6 +72,8 @@ class CrawlerUrl
         $crawler = $this->client->request('GET', $baseUrl);
         $statusCode = $this->client->getResponse()->getStatus();
         $contentType = $this->client->getResponse()->getHeader('Content-Type');
+
+        $this->setBaseUrl($this->client->getRequest()->getUri());
         
         if ($statusCode == 200) {
             if (strpos($contentType, 'text/html') !== false) {
@@ -92,10 +98,10 @@ class CrawlerUrl
 
         $crawlersCss = $crawler->filter('link')->extract('href');
         foreach ($crawlersCss as $nodeUrl) {
-            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
             $nodeUrl = $this->normalizeLink($nodeUrl);
+            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
             if (!$this->checkIfExternal($nodeUrl)) {
-                if (!in_array($nodeUrl, $this->siteCss) && strcmp($path, 'css') === 0) {
+                if (!in_array($nodeUrl, $this->siteCss) && strpos($path, 'css') !== false) {
                     array_push($this->siteCss, $nodeUrl);
                 }
             }
@@ -103,10 +109,10 @@ class CrawlerUrl
 
         $crawlersJs = $crawler->filter('script')->extract('src');
         foreach ($crawlersJs as $nodeUrl) {
-            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
             $nodeUrl = $this->normalizeLink($nodeUrl);
+            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
             if (!$this->checkIfExternal($nodeUrl)) {
-                if (!in_array($nodeUrl, $this->siteJs) && strcmp($path, 'js') === 0) {
+                if (!in_array($nodeUrl, $this->siteJs) && strpos($path, 'js') !== false) {
                     array_push($this->siteJs, $nodeUrl);
                 }
             }
