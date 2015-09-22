@@ -43,6 +43,9 @@ class CrawlUrlCommand extends Command
         $crawlCommand = new CrawlerUrl($client);
         $crawlCommand->setBaseUrl($url);
         $crawlCommand->crawling();
-        
+
+        // print_r($crawlCommand->getSiteLink());
+        // print_r($crawlCommand->getSiteCss());
+        // print_r($crawlCommand->getSiteJs());
     }
 }
