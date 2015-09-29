@@ -8,17 +8,19 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class CrawlerUrl
 {
+    protected $retry = 3;
+
     protected $baseUrl;
 
-    protected $siteLink;
+    protected $siteUrl;
 
     protected $siteJs;
 
     protected $siteCss;
 
-    protected $linkToCrawl;
+    protected $siteBrokenLink;
 
-    protected $countBrokenLink;
+    protected $siteFile;
 
     protected $client;
 
@@ -26,17 +28,17 @@ class CrawlerUrl
 
     public function __construct(Client $client)
     {
-        $this->siteLink = array();
+        $this->siteUrl = array();
         $this->siteJs = array();
         $this->siteCss = array();
         $this->linkToCrawl = array();
-        $this->countBrokenLink = 0;
+        $this->siteBrokenLink = array();
+        $this->siteFile = array();
         $this->contentType = true;
         
         $guzzle = new Guzzle([
             'on_headers' => function (\Psr\Http\Message\ResponseInterface $response) {
-                if (($response->getStatusCode() < 300 || $response->getStatusCode() >= 400) &&
-                    strpos($response->getHeaderLine('Content-Type'), 'text/html') === false) {
+                if (strpos($response->getHeaderLine('Content-Type'), 'text/html') === false) {
                     $this->contentType = false;
                     throw new \Exception;
                 } else {
@@ -48,19 +50,25 @@ class CrawlerUrl
         $this->client = $client;
     }
 
-    public function checkIfCrawlable($uri)
+    /**
+     * Check url is crawlable or not
+     * @param  string $url
+     * @return boolean
+     */
+    public function checkIfCrawlable($url)
     {
-        if (empty($uri)) {
+        if (empty($url)) {
             return false;
         }
 
         $stop_links = array(
-            '@^javascript\:void\(0\)$@',
+            '@^javascript\:void\(0\);?$@',
             '@^#.*@',
+            '@^void\(0\);$@'
         );
 
         foreach ($stop_links as $ptrn) {
-            if (preg_match($ptrn, $uri)) {
+            if (preg_match($ptrn, $url)) {
                 return false;
             }
         }
@@ -68,30 +76,49 @@ class CrawlerUrl
         return true;
     }
 
-    public function normalizeLink($uri)
+    /**
+     * Change url to absolute path if currently relative
+     * @param  string $url
+     * @return string
+     */
+    public function normalizeLink($url)
     {
-        $uri = preg_replace('@#.*$@', '', $uri);
-        $parse = parse_url($uri);
-        if (!empty($uri)) {
+        $url = preg_replace('@#.*$@', '', $url);
+        $url = preg_replace('/[.]+\//', '', $url);
+        $parse = parse_url($url);
+        if (!empty($url)) {
+            if (empty($parse['scheme']) && !empty($parse['host'])) {
+                return 'http:' . $url;
+            }
             if (!empty($parse['host'])) {
                 if (!empty($parse['path'])) {
                     if ($parse['path'] === '/') {
                         return $parse['scheme'] . '://' . $parse['host'];
+                    } elseif (substr($parse['path'], -1) === '/') {
+                        return rtrim($url, '/');
                     }
                 }
-                return $uri;
+                return $url;
             } elseif (empty($parse['host'])) {
                 if (!empty($parse['path'])) {
                     if ($parse['path'][0] !== '/') {
                         return $this->baseUrl . '/' . $parse['path'];
+                    } elseif (substr($parse['path'], -1) === '/') {
+                        return rtrim($url, '/');
+                    } else {
+                        return $this->baseUrl . $parse['path'];
                     }
-                    return $this->baseUrl . $parse['path'];
                 }
             }
         }
-        return $uri;
+        return $url;
     }
 
+    /**
+     * Check url is external url or not
+     * @param  string $url
+     * @return boolean
+     */
     public function checkIfExternal($url)
     {
         $baseUrlTrimmed = str_replace(array('http://', 'https://'), '', $this->baseUrl);
@@ -102,26 +129,55 @@ class CrawlerUrl
         }
     }
 
-    public function getSiteLink()
+    /**
+     * Get list of url from the web
+     * @return array
+     */
+    public function getSiteUrl()
     {
-        return $this->siteLink;
+        return $this->siteUrl;
     }
 
+    /**
+     * Get list of css from the web
+     * @return array
+     */
     public function getSiteCss()
     {
         return $this->siteCss;
     }
 
+    /**
+     * Get list of js from the web
+     * @return array
+     */
     public function getSiteJs()
     {
         return $this->siteJs;
     }
 
-    public function getCountBrokenLink()
+    /**
+     * Get number of broken links
+     * @return int
+     */
+    public function getSiteBrokenLink()
     {
-        return $this->countBrokenLink;
+        return $this->siteBrokenLink;
     }
 
+    /**
+     * Get number of file links
+     * @return int
+     */
+    public function getSiteFile()
+    {
+        return $this->siteFile;
+    }
+
+    /**
+     * Set website url for crawling
+     * @param string $baseUrl
+     */
     public function setBaseUrl($baseUrl)
     {
         if (strpos($baseUrl, 'http') === false) {
@@ -131,75 +187,119 @@ class CrawlerUrl
         }
     }
 
+    /**
+     * Set content-type headers manually
+     * @param boolean $value
+     */
+    public function setContentType($value)
+    {
+        $this->contentType = $value;
+    }
+
+    /**
+     * Get main url of website
+     * @return string
+     */
     public function getBaseUrl()
     {
         return $this->baseUrl;
     }
-
-    public function crawling()
+    
+    /**
+     * Function to trigger start crawling a website
+     * @return void
+     */
+    public function start()
     {
-        $count = 0;
-        $baseUrl = $this->getBaseUrl();
-        $baseUrl = $this->normalizeLink($baseUrl);
-        $crawler = $this->client->request('GET', $baseUrl);
-        $this->setBaseUrl($this->client->getRequest()->getUri());
-        array_push($this->linkToCrawl, $this->baseUrl);
+        $baseUrl = $this->normalizeLink($this->getBaseUrl());
 
-        while (!empty($this->linkToCrawl)) {
-            $uri = $this->linkToCrawl[$count];
-            unset($this->linkToCrawl[$count]);
+        $this->crawl($baseUrl);
+    }
 
-            // if ($count === 6) {
-            //     dd($this->linkToCrawl);
-            //     return;
-            // }
+    protected function crawl($url)
+    {
+        // echo $url . ' : ' . count($this->siteUrl) . "\n";
+        $responseUrl = $this->doRequest($url);
+        if (!is_null($responseUrl)) {
+            $listCss = $responseUrl->filterXPath('//*[@rel="stylesheet"]')->extract('href');
+            $this->getAllOtherLink($listCss, $this->siteCss);
 
-            $this->getAllUrl($uri);
-            $count += 1;
+            $listJs = $responseUrl->filter('script')->extract('src');
+            $this->getAllOtherLink($listJs, $this->siteJs);
+
+            $listUrl = $responseUrl->filter('a')->extract('href');
+            $this->getAllUrlRecursive($listUrl);
         }
     }
 
-    protected function getAllUrl($uri)
+    protected function getAllUrlRecursive($lists)
     {
-        $crawler = $this->client->request('GET', $uri);
-        $statusCode = $this->client->getResponse()->getStatus();
-        $crawlersUrl = $crawler->filter('a')->extract('href');
-        foreach ($crawlersUrl as $nodeUrl) {
-            if ($this->checkIfCrawlable($nodeUrl)) {
-                $nodeUrl = $this->normalizeLink($nodeUrl);
-                $inArray = (!in_array($nodeUrl, $this->linkToCrawl) && !in_array($nodeUrl, $this->siteLink));
-                if ($this->contentType && $statusCode === 200 && $inArray &&
-                    !$this->checkIfExternal($nodeUrl)) {
-                    array_push($this->linkToCrawl, $nodeUrl);
-                } elseif ($statusCode === 404) {
-                    $this->countBrokenLink += 1;
+        foreach ($lists as $list) {
+            if ($this->checkIfCrawlable($list)) {
+                $list = $this->normalizeLink($list);
+                if ($this->checkNotInList($list, $this->siteUrl) && !$this->checkIfExternal($list)) {
+                    $this->crawl($list);
                 }
             }
-
         }
-        $crawlersCss = $crawler->filter('link')->extract('href');
-        foreach ($crawlersCss as $nodeUrl) {
-            $nodeUrl = $this->normalizeLink($nodeUrl);
-            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
-            if (!in_array($nodeUrl, $this->siteCss) && strpos($path, 'css') !== false &&
-                !$this->checkIfExternal($nodeUrl)) {
-                array_push($this->siteCss, $nodeUrl);
+    }
+
+    protected function getAllOtherLink($lists, &$siteLink)
+    {
+        foreach ($lists as $list) {
+            if ($this->checkIfCrawlable($list)) {
+                $list = $this->normalizeLink($list);
+                if (!empty($list) && !in_array($list, $siteLink) && !$this->checkIfExternal($list)) {
+                    array_push($siteLink, $list);
+                }
             }
         }
+    }
 
-        $crawlersJs = $crawler->filter('script')->extract('src');
-        foreach ($crawlersJs as $nodeUrl) {
-            $nodeUrl = $this->normalizeLink($nodeUrl);
-            $path = pathinfo($nodeUrl, PATHINFO_EXTENSION);
-            if (!in_array($nodeUrl, $this->siteJs) && strpos($path, 'js') !== false &&
-                !$this->checkIfExternal($nodeUrl)) {
-                array_push($this->siteJs, $nodeUrl);
-            }
+    public function checkNotInList($url)
+    {
+        if (!in_array($url, $this->siteUrl) && !in_array($url, $this->siteBrokenLink)) {
+            return true;
+        }
+        return false;
+    }
+
+    protected function checkStatusCode()
+    {
+        if ($this->client->getResponse()->getStatus() === 200) {
+            return true;
+        } elseif ($this->client->getResponse()->getStatus() >= 400) {
+            return false;
+        }
+    }
+
+    public function doRequest($url, $try = null)
+    {
+        if (is_null($try)) {
+            $try = $this->retry;
         }
 
-        if (!in_array($uri, $this->siteLink) && $statusCode === 200 && $this->contentType) {
-        // dd($this->contentType);
-            array_push($this->siteLink, $uri);
+        if ($try < 0) {
+            return null;
+        }
+
+        try {
+            $responseUrl = $this->client->request('GET', $url);
+            if ($this->checkStatusCode() && $this->contentType) {
+                array_push($this->siteUrl, $url);
+                return $responseUrl;
+            }
+            if (!$this->contentType) {
+                array_push($this->siteFile, $url);
+                return null;
+            }
+            if (!$this->checkStatusCode()) {
+                array_push($this->siteBrokenLink, $url);
+                return null;
+            }
+        } catch (\Exception $e) {
+            $try--;
+            return $this->doRequest($url, $try);
         }
     }
 }
