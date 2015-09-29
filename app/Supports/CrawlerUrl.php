@@ -218,7 +218,7 @@ class CrawlerUrl
 
     protected function crawl($url)
     {
-        // echo $url . ' : ' . count($this->siteUrl) . "\n";
+        echo $url . ' : ' . count($this->siteUrl) . "\n";
         $responseUrl = $this->doRequest($url);
         if (!is_null($responseUrl)) {
             $listCss = $responseUrl->filterXPath('//*[@rel="stylesheet"]')->extract('href');
@@ -228,37 +228,30 @@ class CrawlerUrl
             $this->getAllOtherLink($listJs, $this->siteJs);
 
             $listUrl = $responseUrl->filter('a')->extract('href');
-            $this->getAllUrlRecursive($listUrl);
+            $this->getAllOtherLink($listUrl, $this->siteUrl, true);
         }
     }
 
-    protected function getAllUrlRecursive($lists)
+    protected function getAllOtherLink($lists, &$siteLink, $recursive = false)
     {
         foreach ($lists as $list) {
             if ($this->checkIfCrawlable($list)) {
                 $list = $this->normalizeLink($list);
                 if ($this->checkNotInList($list, $this->siteUrl) && !$this->checkIfExternal($list)) {
-                    $this->crawl($list);
+                    if (!$recursive) {
+                        array_push($siteLink, $list);
+                    }
+                    else {
+                        $this->crawl($list);
+                    }
                 }
             }
         }
     }
 
-    protected function getAllOtherLink($lists, &$siteLink)
+    public function checkNotInList($url, &$siteLink)
     {
-        foreach ($lists as $list) {
-            if ($this->checkIfCrawlable($list)) {
-                $list = $this->normalizeLink($list);
-                if (!empty($list) && !in_array($list, $siteLink) && !$this->checkIfExternal($list)) {
-                    array_push($siteLink, $list);
-                }
-            }
-        }
-    }
-
-    public function checkNotInList($url)
-    {
-        if (!in_array($url, $this->siteUrl) && !in_array($url, $this->siteBrokenLink)) {
+        if (!in_array($url, $siteLink) && !in_array($url, $this->siteBrokenLink)) {
             return true;
         }
         return false;

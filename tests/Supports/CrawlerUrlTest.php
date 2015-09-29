@@ -37,9 +37,17 @@ class CrawlerUrlTest extends TestCase
         $this->assertEquals($uri . '/en', $crawl->normalizeLink('en'));
         $this->assertEquals($uri . '/en', $crawl->normalizeLink($uri . '/en'));
         $this->assertEquals($uri . '/en/test', $crawl->normalizeLink($uri . '/en/test/'));
+        $this->assertEquals($uri . '/en/test?q=123', $crawl->normalizeLink($uri . '/en/test?q=123'));
+        $this->assertEquals($uri . '/en/test?q=123&r=456', $crawl->normalizeLink($uri . '/en/test?q=123&r=456'));
+        $this->assertEquals($uri . '/en/test/?q=123', $crawl->normalizeLink($uri . '/en/test/?q=123'));
+        $this->assertEquals($uri . '/en/test/?q=123&r=456', $crawl->normalizeLink($uri . '/en/test/?q=123&r=456'));
         $this->assertEquals('http://baz.com', $crawl->normalizeLink('http://baz.com'));
         $this->assertEquals('http://baz.com/test', $crawl->normalizeLink('http://baz.com/test'));
+        $this->assertEquals('http://baz.com/test?q=123', $crawl->normalizeLink('http://baz.com/test?q=123'));
+        $this->assertEquals('http://baz.com/test?q=123&r=456', $crawl->normalizeLink('http://baz.com/test?q=123&r=456'));
         $this->assertEquals('http://baz.com/test', $crawl->normalizeLink('http://baz.com/test/'));
+        $this->assertEquals('http://baz.com/test/?q=123', $crawl->normalizeLink('http://baz.com/test/?q=123'));
+        $this->assertEquals('http://baz.com/test/?q=123&r=456', $crawl->normalizeLink('http://baz.com/test/?q=123&r=456'));
         $this->assertEquals('http://baz.com', $crawl->normalizeLink('//baz.com'));
     }
 
@@ -64,6 +72,9 @@ class CrawlerUrlTest extends TestCase
         $crawl = new CrawlerUrl($client);
 
         $this->assertEquals(false, $crawl->checkIfCrawlable('#'));
+        $this->assertEquals(false, $crawl->checkIfCrawlable('#foobar'));
+        $this->assertEquals(false, $crawl->checkIfCrawlable('javascript:void(0);'));
+        $this->assertEquals(false, $crawl->checkIfCrawlable('javascript:executeSomeScripts();'));
         $this->assertEquals(false, $crawl->checkIfCrawlable(''));
     }
 
@@ -77,6 +88,8 @@ class CrawlerUrlTest extends TestCase
 
         $crawl->setBaseUrl('http://foobar.com');
         $this->assertEquals(true, $crawl->checkIfExternal('http://test.com'));
+        $this->assertEquals(true, $crawl->checkIfExternal('https://test.com'));
+        $this->assertEquals(true, $crawl->checkIfExternal('//test.com'));
     }
 
     public function testUrlIsNotExternalUrl()
@@ -89,6 +102,7 @@ class CrawlerUrlTest extends TestCase
 
         $crawl->setBaseUrl('foobar.com');
         $this->assertEquals(false, $crawl->checkIfExternal('http://foobar.com/test'));
+        $this->assertEquals(false, $crawl->checkIfExternal('https://foobar.com/test'));
     }
 
     public function testDoRequestHtml()
