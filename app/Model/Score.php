@@ -32,4 +32,11 @@ class Score extends BaseModel
     {
         return $this->belongsTo(Category::class);
     }
+
+    public function scopeByCategoryName($query, $name)
+    {
+        $query->whereHas('category', function ($query) use ($name) {
+            $query->where('name', $name);
+        });
+    }
 }
